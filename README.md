@@ -282,7 +282,7 @@ Parametric VaR Results:
 - Daily VaR: 3.32% ($33,156 for $1M portfolio)
 
 Historical VaR Results:
-- Overall VaR: 0.0333% ($33,349 for $1M portfolio)
+- Overall VaR: 3.33% ($33,349 for $1M portfolio)
 - 100-day VaR: 3.11% ($31,093 for $1M portfolio)
 ```
 
