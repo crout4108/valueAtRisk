@@ -59,7 +59,7 @@ data = web.DataReader(stocks, data_source="yahoo",
                      start='12/04/2017', end='09/01/2020')['Adj Close']
 
 # Calculate Parametric VaR
-var_calc = ValueAtRisk(confidence_interval=0.95, matrix=data, weights=weights)
+var_calc = ValueAtRisk(interval=0.95, matrix=data, weights=weights)
 
 # Daily VaR (1% or $33,155 for $1M portfolio)
 daily_var_pct = var_calc.var(window=1) * 100
@@ -70,7 +70,7 @@ annual_var_pct = var_calc.var() * 100
 annual_var_dollar = var_calc.var(marketValue=1000000)
 
 # Calculate Historical VaR
-hist_var = HistoricalVaR(confidence_interval=0.95, 
+hist_var = HistoricalVaR(interval=0.95, 
                         matrix=data.values, weights=weights)
 hist_var_dollar = hist_var.var(marketValue=1000000)
 ```
