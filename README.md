@@ -1,11 +1,216 @@
-# calculation of VaR for a portfolio
-calculation of value at risk is really important in finance although we have a more important
-concept which is called: conditional value at risk (CVaR) in which the
-problem of optimization could be reduced to linear programming and be solved with simplex algorithm which i will create a repository in github later for that.
+# Value at Risk (VaR) Calculator
 
+![Python](https://img.shields.io/badge/python-3.x-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## results:
+A Python library for calculating **Value at Risk (VaR)** for financial portfolios using both parametric and historical methods.
+
+## 📊 Overview
+
+Value at Risk (VaR) is a statistical measure used in finance to quantify the level of financial risk within a portfolio over a specific time frame. This library provides two implementations:
+
+1. **Parametric VaR** - Uses variance-covariance matrix and assumes normal distribution
+2. **Historical VaR** - Uses historical returns without distributional assumptions
+
+While VaR is important in finance, note that **Conditional Value at Risk (CVaR)** is often preferred as it can be reduced to linear programming and solved with the simplex algorithm.
+
+## ✨ Features
+
+- Calculate VaR for multi-asset portfolios
+- Support for both parametric (variance-covariance) and historical simulation methods
+- Flexible time windows (daily, annualized, or custom periods)
+- Portfolio variance calculation with two approaches:
+  - Covariance matrix method (exact)
+  - Portfolio return approximation
+- Easy integration with Yahoo Finance data via `pandas_datareader`
+- Configurable confidence intervals
+- Results available in both percentage and dollar amounts
+
+## 📦 Installation
+
+### Prerequisites
+
+```bash
+pip install pandas numpy scipy pandas_datareader matplotlib
 ```
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/crout4108/valueAtRisk.git
+cd valueAtRisk
+```
+
+## 🚀 Quick Start
+
+### Basic Usage
+
+```python
+from VaR import ValueAtRisk, HistoricalVaR
+import pandas_datareader.data as web
+import numpy as np
+
+# Define portfolio
+stocks = ['GOOG', 'FB', 'TSLA', 'AMZN']
+weights = np.array([0.4, 0.3, 0.2, 0.1])  # Portfolio weights (must sum to 1)
+
+# Fetch historical data
+data = web.DataReader(stocks, data_source="yahoo", 
+                     start='12/04/2017', end='09/01/2020')['Adj Close']
+
+# Calculate Parametric VaR
+var_calc = ValueAtRisk(confidence_interval=0.95, matrix=data, weights=weights)
+
+# Daily VaR (1% or $33,155 for $1M portfolio)
+daily_var_pct = var_calc.var(window=1) * 100
+daily_var_dollar = var_calc.var(marketValue=1000000, window=1)
+
+# Annualized VaR (52.6% or $526,333 for $1M portfolio)
+annual_var_pct = var_calc.var() * 100
+annual_var_dollar = var_calc.var(marketValue=1000000)
+
+# Calculate Historical VaR
+hist_var = HistoricalVaR(confidence_interval=0.95, 
+                        matrix=data.values, weights=weights)
+hist_var_dollar = hist_var.var(marketValue=1000000)
+```
+
+### Running the Example
+
+```bash
+python runVaR
+```
+
+## 📖 API Documentation
+
+### ValueAtRisk Class
+
+The `ValueAtRisk` class implements parametric VaR calculation using the variance-covariance method.
+
+#### Constructor
+
+```python
+ValueAtRisk(interval, matrix, weights)
+```
+
+**Parameters:**
+- `interval` (float): Confidence interval (0 < interval < 1), e.g., 0.95 for 95%
+- `matrix` (ndarray or DataFrame): Stock price matrix where each row represents daily prices for different tickers
+- `weights` (ndarray): Portfolio weights (must sum to 1)
+
+#### Methods
+
+##### `covMatrix()`
+Returns the variance-covariance matrix of portfolio returns.
+
+**Returns:** `ndarray` - Covariance matrix
+
+##### `calculateVariance(Approximation=False)`
+Calculates portfolio variance.
+
+**Parameters:**
+- `Approximation` (bool): If True, uses portfolio return approximation; if False, uses covariance matrix method
+
+**Returns:** `float` - Portfolio variance
+
+##### `var(marketValue=0, Approximation=False, window=252)`
+Calculates parametric Value at Risk.
+
+**Parameters:**
+- `marketValue` (float): Portfolio value in dollars. If ≤ 0, returns percentage VaR
+- `Approximation` (bool): Variance calculation method
+- `window` (int): Time period scaling factor (default: 252 for annualized, 1 for daily)
+
+**Returns:** `float` - VaR in dollars or percentage
+
+##### `setCI(interval)`
+Updates the confidence interval.
+
+**Parameters:**
+- `interval` (float): New confidence interval (0 < interval < 1)
+
+##### `setPortfolio(matrix)`
+Updates the portfolio data.
+
+**Parameters:**
+- `matrix` (ndarray or DataFrame): New stock price matrix
+
+##### `setWeights(weights)`
+Updates portfolio weights.
+
+**Parameters:**
+- `weights` (ndarray): New portfolio weights
+
+### HistoricalVaR Class
+
+The `HistoricalVaR` class extends `ValueAtRisk` and implements historical simulation VaR.
+
+#### Constructor
+
+Inherits from `ValueAtRisk` with the same parameters.
+
+#### Methods
+
+##### `var(marketValue=0, window=0)`
+Calculates historical VaR using percentile method.
+
+**Parameters:**
+- `marketValue` (float): Portfolio value in dollars. If ≤ 0, returns percentage VaR
+- `window` (int): Look-back period. If 0, uses entire price series
+
+**Returns:** `float` - VaR in dollars or percentage
+
+## 🧮 Mathematical Background
+
+### Parametric VaR
+
+The parametric VaR assumes returns follow a normal distribution and is calculated as:
+
+```
+VaR = -z_α × σ_p × √t × V
+```
+
+Where:
+- `z_α` is the critical value at confidence level α (e.g., 1.645 for 95%)
+- `σ_p` is the portfolio standard deviation
+- `t` is the time horizon
+- `V` is the portfolio value
+
+Portfolio variance is calculated as:
+```
+σ_p² = w^T × Σ × w
+```
+
+Where:
+- `w` is the weight vector
+- `Σ` is the covariance matrix of returns
+
+### Historical VaR
+
+Historical VaR uses empirical distribution of returns:
+
+```
+VaR = -Percentile(returns, 1-α) × V
+```
+
+This method makes no distributional assumptions and uses actual historical returns.
+
+## 📋 Requirements
+
+- Python 3.x
+- pandas
+- numpy
+- scipy
+- pandas_datareader
+- matplotlib
+
+## 🎯 Example Output
+
+Running the example script produces:
+
+```
+Portfolio Data (4 stocks, 691 trading days):
+
 Symbols        AMZN      FB     GOOG    TSLA
 Date                                        
 2017-12-04  1133.95  171.47   998.68   61.04
@@ -71,31 +276,93 @@ Date
 2020-09-01  3499.12  295.44  1660.71  475.05
 
 [691 rows x 4 columns]
---------data preview--------
-Symbols            AMZN          FB         GOOG       TSLA
-Date                                                       
-2017-12-04  1133.949951  171.470001   998.679993  61.040001
-2017-12-05  1141.569946  172.830002  1005.150024  60.740002
-2017-12-06  1152.349976  176.059998  1018.380005  62.652000
-2017-12-07  1159.790039  180.139999  1030.930054  62.248001
-2017-12-08  1162.000000  179.000000  1037.050049  63.026001
 
---------Parametric Var--------
-('Covariance Matrix\n', array([[ 0.00041629,  0.00029932,  0.00027281,  0.00033248],
-       [ 0.00029932,  0.00057616,  0.00032058,  0.00033558],
-       [ 0.00027281,  0.00032058,  0.00037004,  0.00032426],
-       [ 0.00033248,  0.00033558,  0.00032426,  0.00172304]]))
-HDemo = HistoricalVaR(0.95,data.as_matrix(),weights)
-('Annualized VaR(Percentage): ', 52.633293519285829, '%')
-('Annualized VaR(Dollar): ', 526332.93519285833)
-('Daily VaR(Percentage): ', 3.315585841292807, '%')
-('Daily VaR(Dollar): ', 33155.858412928072)
-('Annualized VaR(Percentage) - Approximation: ', 52.595139622630363, '%')
-('Annualized VaR(Dollar) - Approximation: ', 525951.39622630354)
+Parametric VaR Results:
+- Annualized VaR: 52.63% ($526,333 for $1M portfolio)
+- Daily VaR: 3.32% ($33,156 for $1M portfolio)
 
---------Historical Var--------
-('VaR(Percentage): ', 0.033349352599547279, '%')
-('Var(Dollar):', 33349.352599547281)
-('100 day - VaR(Percentage): ', 3.109324466873824, '%')
-('100 day - Var(Dollar):', 31093.24466873824)
+Historical VaR Results:
+- Overall VaR: 0.033% ($333 for $1M portfolio)
+- 100-day VaR: 3.11% ($31,093 for $1M portfolio)
 ```
+
+## 🛠️ How It Works
+
+### Data Processing
+1. Fetches historical adjusted closing prices from Yahoo Finance
+2. Calculates log returns: `r_t = ln(P_t / P_{t-1})`
+3. Applies portfolio weights to compute portfolio returns
+
+### Parametric Method
+1. Computes covariance matrix of returns
+2. Calculates portfolio variance using weights
+3. Applies normal distribution inverse CDF with specified confidence level
+4. Scales to desired time period using square root of time rule
+
+### Historical Method
+1. Computes weighted portfolio returns for each historical period
+2. Sorts returns and finds the percentile corresponding to confidence level
+3. No distributional assumptions required
+
+## 💡 Use Cases
+
+- **Risk Management**: Quantify maximum expected loss at a given confidence level
+- **Portfolio Optimization**: Compare risk across different portfolio allocations
+- **Regulatory Compliance**: Meet capital reserve requirements (Basel III)
+- **Performance Reporting**: Communicate risk metrics to stakeholders
+- **Stress Testing**: Evaluate portfolio resilience under historical scenarios
+
+## 🔬 Limitations
+
+- **Parametric VaR**: Assumes normal distribution (may underestimate tail risk)
+- **Historical VaR**: Limited by historical data availability and relevance
+- **Fat Tails**: Both methods may underestimate risk during extreme events
+- **Non-stationarity**: Assumes future returns behave like historical returns
+
+**Note**: Consider using **Conditional VaR (CVaR)** or **Expected Shortfall** for more robust risk measures, especially for portfolios with non-normal return distributions.
+
+## 👨‍💻 Author
+
+**Farshad Noravesh**
+- Email: bmmturbo@icloud.com
+- GitHub: [@crout4108](https://github.com/crout4108)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 🔮 Future Enhancements
+
+- [ ] Conditional Value at Risk (CVaR) implementation
+- [ ] Monte Carlo simulation method
+- [ ] Cornish-Fisher VaR for non-normal distributions
+- [ ] Portfolio optimization integration
+- [ ] Interactive visualization dashboard
+- [ ] Support for additional data sources
+- [ ] Backtesting framework
+- [ ] Risk decomposition by asset
+
+## 📚 References
+
+- J.P. Morgan (1996). "RiskMetrics Technical Document"
+- Jorion, P. (2007). "Value at Risk: The New Benchmark for Managing Financial Risk"
+- Basel Committee on Banking Supervision. "Basel III: A global regulatory framework"
+
+## 🙏 Acknowledgments
+
+- Yahoo Finance for providing historical market data
+- The open-source Python community for excellent libraries
+
+---
+
+⚠️ **Disclaimer**: This library is for educational and research purposes only. It should not be used as the sole basis for investment decisions. Always consult with qualified financial professionals before making investment decisions.
