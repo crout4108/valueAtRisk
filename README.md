@@ -95,7 +95,7 @@ ValueAtRisk(interval, matrix, weights)
 
 **Parameters:**
 - `interval` (float): Confidence interval (0 < interval < 1), e.g., 0.95 for 95%
-- `matrix` (ndarray or DataFrame): Stock price matrix where each row represents daily prices for different tickers
+- `matrix` (ndarray or DataFrame): Stock price matrix where rows represent dates/time periods and columns represent different tickers/assets
 - `weights` (ndarray): Portfolio weights (must sum to 1)
 
 #### Methods
@@ -282,7 +282,7 @@ Parametric VaR Results:
 - Daily VaR: 3.32% ($33,156 for $1M portfolio)
 
 Historical VaR Results:
-- Overall VaR: 0.033% ($333 for $1M portfolio)
+- Overall VaR: 0.0333% ($33,349 for $1M portfolio)
 - 100-day VaR: 3.11% ($31,093 for $1M portfolio)
 ```
 
