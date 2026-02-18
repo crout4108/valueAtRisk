@@ -14,9 +14,9 @@ class HistoricalVaR(ValueAtRisk):
             raise  Exception("invalid Window, cannot excess", len(self.portfolioReturn))
 
         if(window > 0 and window < len(self.portfolioReturn)):
-            PercentageVaR = abs(np.percentile(self.portfolioReturn[-window:],100*(1-self.ci),interpolation = 'nearest'))
+            PercentageVaR = abs(np.percentile(self.portfolioReturn[-window:],100*(1-self.ci),method = 'nearest'))
         else:
-            PercentageVaR = abs(np.percentile(self.portfolioReturn,100*(1-self.ci),interpolation = 'nearest'))
+            PercentageVaR = abs(np.percentile(self.portfolioReturn,100*(1-self.ci),method = 'nearest'))
 
         if(marketValue <= 0):
             return PercentageVaR
