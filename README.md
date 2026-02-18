@@ -204,6 +204,12 @@ This method makes no distributional assumptions and uses actual historical retur
 - pandas_datareader
 - matplotlib
 
+Install all dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## 🎯 Example Output
 
 Running the example script produces:
@@ -320,6 +326,50 @@ Historical VaR Results:
 - **Non-stationarity**: Assumes future returns behave like historical returns
 
 **Note**: Consider using **Conditional VaR (CVaR)** or **Expected Shortfall** for more robust risk measures, especially for portfolios with non-normal return distributions.
+
+## 🧪 Testing
+
+This project includes comprehensive unit tests for both the `ValueAtRisk` and `HistoricalVaR` classes.
+
+### Running Tests
+
+To run all tests:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+To run tests for a specific module:
+
+```bash
+# Test ValueAtRisk class
+python -m unittest tests.test_var -v
+
+# Test HistoricalVaR class
+python -m unittest tests.test_historical_var -v
+```
+
+### Test Coverage
+
+The test suite includes 34 tests covering:
+
+**ValueAtRisk Class (21 tests):**
+- Initialization with valid and invalid inputs
+- Covariance matrix calculation
+- Variance calculation (exact and approximation methods)
+- VaR calculation (percentage and dollar amounts)
+- Time window scaling
+- Confidence interval updates
+- Portfolio and weights updates
+- DataFrame compatibility
+
+**HistoricalVaR Class (13 tests):**
+- Initialization and inheritance
+- VaR calculation with different window sizes
+- Percentage vs dollar consistency
+- Edge cases and error handling
+- Confidence interval effects
+- Portfolio return calculations
 
 ## 👨‍💻 Author
 
