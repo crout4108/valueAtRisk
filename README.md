@@ -14,6 +14,14 @@ Value at Risk (VaR) is a statistical measure used in finance to quantify the lev
 
 While VaR is important in finance, note that **Conditional Value at Risk (CVaR)** is often preferred as it can be reduced to linear programming and solved with the simplex algorithm.
 
+## 📚 Documentation
+
+- **[API Reference](docs/API_REFERENCE.md)** - Comprehensive API documentation
+- **[Examples](examples/)** - Practical usage examples
+- **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
+
 ## ✨ Features
 
 - Calculate VaR for multi-asset portfolios
