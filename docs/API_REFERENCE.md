@@ -338,6 +338,19 @@ var_pct = hist_var.var() * 100
 | 252 | Trailing 1-year window |
 | 504 | Trailing 2-year window |
 
+**Choosing the Right Window:**
+- **Larger windows (252+)**: More stable estimates, captures long-term patterns, but may include outdated market regimes
+- **Smaller windows (100-252)**: More responsive to recent market conditions, but estimates may be less stable
+- **Window = 0 (all data)**: Maximum data usage, but assumes all historical periods are equally relevant
+
+**Data Requirements:**
+For reliable Historical VaR estimates:
+- Minimum: 100 observations (about 4 months of daily data)
+- Recommended: 252+ observations (1+ year of daily data)
+- Ideal: 500+ observations (2+ years of daily data)
+
+At 95% confidence, you're looking at the 5th percentile. With only 100 observations, you have just 5 data points informing your estimate, which can be unstable.
+
 **Comparison with Parametric VaR:**
 
 | Aspect | Parametric | Historical |
@@ -347,6 +360,97 @@ var_pct = hist_var.var() * 100
 | Data requirements | Less sensitive | Needs sufficient history |
 | Computation | Fast | Fast |
 | Interpretation | Theoretical | Empirical |
+
+### Best Practices for Historical VaR
+
+#### 1. Data Quality and Quantity
+
+```python
+# Check if you have sufficient data
+min_required = 100
+data_length = len(prices)
+
+if data_length < min_required:
+    print(f"Warning: Only {data_length} observations available.")
+    print(f"Recommended minimum: {min_required}")
+    print("Consider using a longer historical period or parametric VaR.")
+```
+
+#### 2. Handling Market Regime Changes
+
+When markets undergo structural changes (e.g., 2008 financial crisis, COVID-19), older data may not be relevant:
+
+```python
+# Use rolling window to focus on recent regime
+hist_var = HistoricalVaR(0.95, prices, weights)
+
+# Recent market conditions (last 6 months)
+recent_var = hist_var.var(marketValue=1000000, window=126)
+
+# Full history (may include old regimes)
+full_var = hist_var.var(marketValue=1000000, window=0)
+
+if abs(recent_var - full_var) / full_var > 0.2:  # 20% difference
+    print("Warning: Recent VaR differs significantly from historical VaR")
+    print("Consider focusing on recent data or investigating regime change")
+```
+
+#### 3. Confidence Level Considerations
+
+Higher confidence levels require more data:
+
+```python
+# For 99% confidence, you're looking at 1st percentile
+# With 100 observations, that's just 1 data point!
+confidence_levels = [0.90, 0.95, 0.99]
+
+for ci in confidence_levels:
+    hist_var = HistoricalVaR(ci, prices, weights)
+    var = hist_var.var(marketValue=1000000)
+
+    # Estimate number of observations in tail
+    tail_observations = int(len(prices) * (1 - ci))
+    print(f"{ci*100}% VaR: ${var:,.0f} (based on {tail_observations} tail observations)")
+```
+
+#### 4. Backtesting Historical VaR
+
+Validate your VaR estimates:
+
+```python
+# Calculate VaR
+hist_var = HistoricalVaR(0.95, prices, weights)
+var_estimate = hist_var.var()
+
+# Calculate actual portfolio returns
+portfolio_returns = np.dot(hist_var.returnMatrix, weights)
+
+# Count exceedances (losses exceeding VaR)
+exceedances = np.sum(portfolio_returns < -var_estimate)
+exceedance_rate = exceedances / len(portfolio_returns)
+
+print(f"Expected exceedance rate: {(1-0.95)*100:.1f}%")
+print(f"Actual exceedance rate: {exceedance_rate*100:.1f}%")
+
+# Rough validation: actual should be close to expected
+if abs(exceedance_rate - 0.05) > 0.02:  # More than 2% difference
+    print("Warning: VaR estimate may not be well-calibrated")
+```
+
+#### 5. Stress Testing with Historical Scenarios
+
+Identify worst historical periods:
+
+```python
+hist_var = HistoricalVaR(0.95, prices, weights)
+portfolio_returns = np.dot(hist_var.returnMatrix, weights)
+
+# Find worst days
+worst_returns = np.sort(portfolio_returns)[:10]
+print("10 worst daily losses:")
+for i, ret in enumerate(worst_returns, 1):
+    print(f"{i}. {ret*100:.2f}% loss (${ret * 1000000:,.0f} on $1M)")
+```
 
 ---
 

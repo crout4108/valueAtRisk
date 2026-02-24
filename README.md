@@ -17,6 +17,7 @@ While VaR is important in finance, note that **Conditional Value at Risk (CVaR)*
 ## 📚 Documentation
 
 - **[API Reference](docs/API_REFERENCE.md)** - Comprehensive API documentation
+- **[Historical VaR Guide](docs/HISTORICAL_VAR_GUIDE.md)** - In-depth guide to Historical VaR methodology and best practices
 - **[Examples](examples/)** - Practical usage examples
 - **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards
@@ -195,13 +196,60 @@ Where:
 
 ### Historical VaR
 
-Historical VaR uses empirical distribution of returns:
+Historical VaR uses the empirical distribution of returns without making distributional assumptions. It calculates VaR by finding the appropriate percentile of actual historical portfolio returns.
 
+**Formula:**
 ```
 VaR = -Percentile(returns, 1-α) × V
 ```
 
-This method makes no distributional assumptions and uses actual historical returns.
+Where:
+- `returns` are the historical portfolio returns (weighted by portfolio allocation)
+- `α` is the confidence level (e.g., 0.95 for 95%)
+- `V` is the portfolio value
+
+**Methodology:**
+1. Calculate weighted portfolio returns for each historical period: `R_p = Σ(w_i × r_i)`
+2. Sort the returns in ascending order
+3. Find the (1-α) percentile (e.g., 5th percentile for 95% confidence)
+4. Take the absolute value to represent loss
+5. Scale by portfolio value if needed
+
+**Advantages:**
+- Makes no distributional assumptions (distribution-free method)
+- Captures actual historical market behavior including fat tails and skewness
+- Simple and intuitive interpretation
+- Reflects real market events and correlations
+
+**Limitations:**
+- Limited by availability and relevance of historical data
+- Assumes future returns will behave like past returns (non-stationarity risk)
+- May not capture unprecedented events (black swan events)
+- Requires sufficient historical data for reliable estimates
+- Can be affected by outliers in the historical period
+
+### Choosing Between Methods
+
+**Use Parametric VaR when:**
+- Returns are approximately normally distributed
+- You need fast calculations for large portfolios
+- You want smooth, stable estimates
+- Historical data is limited
+- You need theoretical consistency
+
+**Use Historical VaR when:**
+- Returns exhibit fat tails or significant skewness
+- You want to avoid distributional assumptions
+- Sufficient historical data is available (100+ observations recommended)
+- Actual historical market behavior is more relevant than theoretical distributions
+- You need to account for extreme events that actually occurred
+
+**Best Practice:**
+Calculate both methods and compare results. Large discrepancies may indicate:
+- Non-normal return distributions (fat tails, skewness)
+- Recent market regime changes
+- Structural breaks in the data
+- Need for more sophisticated methods (e.g., GARCH, Extreme Value Theory)
 
 ## 📋 Requirements
 
