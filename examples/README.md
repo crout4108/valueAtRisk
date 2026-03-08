@@ -50,6 +50,23 @@ Analyzes how VaR changes with different confidence levels.
 python examples/confidence_sensitivity.py
 ```
 
+### 4. Historical VaR (`historical_var_example.py`)
+
+Dedicated demonstration of the `HistoricalVaR` class using self-contained synthetic data (no internet connection required).
+
+**Features:**
+- Historical VaR using the full price history
+- Rolling-window VaR at multiple look-back periods (30, 60, 100, 252 days)
+- Confidence level sensitivity (90%, 95%, 99%)
+- Side-by-side comparison with parametric VaR
+- Impact of portfolio weight allocation on historical VaR
+- Accepting a pandas DataFrame as input
+
+**Run:**
+```bash
+python examples/historical_var_example.py
+```
+
 ## Prerequisites
 
 Make sure all dependencies are installed:
