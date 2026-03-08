@@ -200,5 +200,169 @@ class TestHistoricalVaR(unittest.TestCase):
         self.assertGreater(var_result, 0)
 
 
+    # ------------------------------------------------------------------
+    # Deterministic tests with pre-computed expected values
+    # ------------------------------------------------------------------
+
+    def test_var_exact_value_full_window(self):
+        """Test VaR against a pre-computed expected value (full history)"""
+        # 6 prices → 5 log returns; equal weights
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+
+        # Portfolio returns (weighted average of per-asset log returns):
+        #   [0.025602, -0.045770, 0.049504, -0.013074, 0.026710]
+        # Sorted: [-0.045770, -0.013074, 0.025602, 0.026710, 0.049504]
+        # 5th percentile using 'nearest' on 5 values selects index 0 → -0.045770
+        # VaR = abs(-0.045770) = 0.045769647237542024
+        expected_var = 0.045769647237542024
+
+        hist_var = HistoricalVaR(0.95, known_prices, equal_weights)
+        var_result = hist_var.var()
+
+        self.assertAlmostEqual(var_result, expected_var, places=12)
+
+    def test_var_exact_value_with_window(self):
+        """Test VaR against a pre-computed expected value using a rolling window"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+
+        # window=3 selects the last 3 portfolio returns: [0.049504, -0.013074, 0.026710]
+        # Sorted: [-0.013074, 0.026710, 0.049504]
+        # 5th percentile using 'nearest' on 3 values selects index 0 → -0.013074
+        # VaR = abs(-0.013074) = 0.013073571051093559
+        expected_var_window3 = 0.013073571051093559
+
+        hist_var = HistoricalVaR(0.95, known_prices, equal_weights)
+        var_result = hist_var.var(window=3)
+
+        self.assertAlmostEqual(var_result, expected_var_window3, places=12)
+
+    def test_var_exact_dollar_value(self):
+        """Test that dollar VaR equals percentage VaR scaled by market value exactly"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+        market_value = 100_000
+
+        expected_var_pct = 0.045769647237542024
+        expected_var_dollar = expected_var_pct * market_value  # 4576.9647...
+
+        hist_var = HistoricalVaR(0.95, known_prices, equal_weights)
+        var_dollar = hist_var.var(marketValue=market_value)
+
+        self.assertAlmostEqual(var_dollar, expected_var_dollar, places=8)
+
+    def test_set_weights_updates_var(self):
+        """Test that setWeights correctly updates the VaR calculation"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+        first_only_weights = np.array([1.0, 0.0, 0.0])
+
+        hist_var = HistoricalVaR(0.95, known_prices, equal_weights)
+        var_before = hist_var.var()
+
+        hist_var.setWeights(first_only_weights)
+        var_after = hist_var.var()
+
+        # VaR should change when weights change
+        self.assertNotAlmostEqual(var_before, var_after, places=6)
+
+        # Verify the new VaR matches the pre-computed value for first-asset-only weights
+        # First-asset log returns: [log(110/100), log(95/110), log(105/95), log(100/105), log(108/100)]
+        #   ≈ [0.09531, -0.14660, 0.10008, -0.04879, 0.07696]
+        # Sorted: [-0.14660, -0.04879, 0.07696, 0.09531, 0.10008]
+        # 5th percentile using 'nearest' on 5 values selects index 0 → -0.14660 (the minimum)
+        # VaR = abs(-0.14660) = 0.1466034741918758
+        expected_var_after = 0.1466034741918758
+        self.assertAlmostEqual(var_after, expected_var_after, places=12)
+
+    def test_set_portfolio_updates_var(self):
+        """Test that setPortfolio correctly updates the VaR calculation"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        # Uniformly trending prices produce very small returns
+        trending_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [102.0, 198.0, 152.0],
+            [104.0, 196.0, 154.0],
+            [106.0, 194.0, 156.0],
+            [108.0, 192.0, 158.0],
+            [110.0, 190.0, 160.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+
+        hist_var = HistoricalVaR(0.95, known_prices, equal_weights)
+        var_original = hist_var.var()
+
+        hist_var.setPortfolio(trending_prices)
+        var_updated = hist_var.var()
+
+        # VaR should change after updating the price data
+        self.assertNotAlmostEqual(var_original, var_updated, places=6)
+
+        # Pre-computed expected value for the trending prices
+        expected_var_updated = 0.006818873669253674
+        self.assertAlmostEqual(var_updated, expected_var_updated, places=12)
+
+    def test_higher_confidence_level_increases_var(self):
+        """Test that a higher confidence level yields equal or greater VaR on larger data"""
+        # Use a larger dataset so confidence-level ordering is reliable
+        np.random.seed(0)
+        base = np.array([100.0, 200.0, 150.0])
+        rets = np.random.normal(0, 0.02, (99, 3))
+        prices = np.zeros((100, 3))
+        prices[0] = base
+        for i in range(1, 100):
+            prices[i] = prices[i - 1] * np.exp(rets[i - 1])
+
+        weights = np.array([0.4, 0.3, 0.3])
+
+        hist_var_90 = HistoricalVaR(0.90, prices, weights)
+        hist_var_95 = HistoricalVaR(0.95, prices, weights)
+        hist_var_99 = HistoricalVaR(0.99, prices, weights)
+
+        var_90 = hist_var_90.var()
+        var_95 = hist_var_95.var()
+        var_99 = hist_var_99.var()
+
+        # VaR must be non-decreasing as confidence level rises
+        self.assertLessEqual(var_90, var_95)
+        self.assertLessEqual(var_95, var_99)
+
+
 if __name__ == '__main__':
     unittest.main()
