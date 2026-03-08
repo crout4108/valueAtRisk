@@ -233,6 +233,215 @@ class TestValueAtRisk(unittest.TestCase):
         # Higher confidence interval should give higher VaR
         self.assertGreater(var_99, var_95)
 
+    # ------------------------------------------------------------------
+    # Deterministic tests with pre-computed expected values
+    # ------------------------------------------------------------------
+
+    def test_var_exact_value_window1(self):
+        """Test parametric VaR against a pre-computed expected value (window=1)"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+
+        # Portfolio variance = w^T * cov * w ≈ 0.0014290062894663693
+        # VaR = norm.ppf(0.95) * sqrt(variance) * sqrt(1) ≈ 0.062179085007154224
+        expected_var = 0.062179085007154224
+
+        var = ValueAtRisk(0.95, known_prices, equal_weights)
+        var_result = var.var(marketValue=0, window=1)
+
+        self.assertAlmostEqual(var_result, expected_var, places=12)
+
+    def test_var_exact_dollar_value(self):
+        """Test that dollar VaR equals percentage VaR scaled by market value exactly"""
+        known_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [110.0, 190.0, 155.0],
+            [95.0,  205.0, 145.0],
+            [105.0, 195.0, 160.0],
+            [100.0, 210.0, 150.0],
+            [108.0, 200.0, 158.0],
+        ])
+        equal_weights = np.array([1/3, 1/3, 1/3])
+        market_value = 100_000
+
+        expected_var_pct = 0.062179085007154224
+        expected_var_dollar = expected_var_pct * market_value  # 6217.9085...
+
+        var = ValueAtRisk(0.95, known_prices, equal_weights)
+        var_dollar = var.var(marketValue=market_value, window=1)
+
+        self.assertAlmostEqual(var_dollar, expected_var_dollar, places=8)
+
+    def test_var_with_approximation_flag(self):
+        """Test VaR calculation using Approximation=True flag"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        var_approx = var.var(marketValue=0, Approximation=True, window=1)
+
+        # Pre-computed expected value: variance uses ddof=0 → slightly smaller than exact
+        expected_var_approx = 0.012439227245701134
+        self.assertAlmostEqual(var_approx, expected_var_approx, places=12)
+
+    def test_var_approximation_close_to_exact(self):
+        """Test that approximation and exact VaR methods give similar results"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        var_exact = var.var(marketValue=0, Approximation=False, window=1)
+        var_approx = var.var(marketValue=0, Approximation=True, window=1)
+
+        # Both should be positive
+        self.assertGreater(var_exact, 0)
+        self.assertGreater(var_approx, 0)
+
+        # Approximation should be within 15% of exact (approximation uses ddof=0,
+        # exact uses ddof=1, so they differ by a factor of sqrt((n-1)/n))
+        self.assertAlmostEqual(var_exact, var_approx, delta=var_exact * 0.15)
+
+    def test_single_asset_portfolio(self):
+        """Test VaR with a single-asset portfolio"""
+        single_prices = np.array([
+            [100.0],
+            [102.0],
+            [99.0],
+            [105.0],
+            [103.0],
+            [106.0],
+        ])
+        single_weight = np.array([1.0])
+
+        # Pre-computed: variance ≈ 0.001315152557546532
+        # VaR = norm.ppf(0.95) * sqrt(variance) ≈ 0.05965066967945004
+        expected_var = 0.05965066967945004
+
+        var = ValueAtRisk(0.95, single_prices, single_weight)
+        var_result = var.var(marketValue=0, window=1)
+
+        self.assertAlmostEqual(var_result, expected_var, places=12)
+
+    def test_two_asset_portfolio(self):
+        """Test VaR with a two-asset portfolio"""
+        two_prices = np.array([
+            [100.0, 200.0],
+            [105.0, 198.0],
+            [102.0, 202.0],
+            [108.0, 196.0],
+            [106.0, 204.0],
+        ])
+        two_weights = np.array([0.6, 0.4])
+
+        # Pre-computed VaR ≈ 0.026582067949851594
+        expected_var = 0.026582067949851594
+
+        var = ValueAtRisk(0.95, two_prices, two_weights)
+        var_result = var.var(marketValue=0, window=1)
+
+        self.assertAlmostEqual(var_result, expected_var, places=12)
+
+    def test_set_portfolio_dimension_validation(self):
+        """Test that setPortfolio raises an exception for 1D input"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        invalid_matrix = np.array([100, 200, 150])
+        with self.assertRaises(Exception) as context:
+            var.setPortfolio(invalid_matrix)
+        self.assertIn("Only accept 2 dimensions matrix", str(context.exception))
+
+    def test_set_ci_boundary_values(self):
+        """Test that boundary CI values (0 and 1) raise exceptions while near-boundary values work"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Exactly 0 and 1 should raise
+        with self.assertRaises(Exception):
+            var.setCI(0)
+        with self.assertRaises(Exception):
+            var.setCI(1)
+
+        # Near-boundary values should work
+        var.setCI(0.01)
+        self.assertAlmostEqual(var.ci, 0.01)
+        var.setCI(0.999)
+        self.assertAlmostEqual(var.ci, 0.999)
+
+    def test_cov_matrix_diagonal_matches_per_asset_variance(self):
+        """Test that the diagonal of the covariance matrix equals per-asset sample variances"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        cov = var.covMatrix()
+
+        for i in range(self.sample_prices.shape[1]):
+            asset_returns = var.returnMatrix[:, i]
+            expected_var_i = np.var(asset_returns, ddof=1)
+            self.assertAlmostEqual(cov[i, i], expected_var_i, places=12)
+
+    def test_var_annual_vs_daily_window_scaling(self):
+        """Test that window=252 VaR is sqrt(252) times the window=1 VaR"""
+        import math
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        var_daily = var.var(marketValue=0, window=1)
+        var_annual = var.var(marketValue=0, window=252)
+
+        expected_ratio = math.sqrt(252)
+        actual_ratio = var_annual / var_daily
+
+        self.assertAlmostEqual(actual_ratio, expected_ratio, places=10)
+
+    def test_calculate_variance_stores_attribute(self):
+        """Test that calculateVariance stores result as var.variance attribute"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # variance attribute should not exist before the first calculation
+        self.assertFalse(hasattr(var, 'variance'))
+        returned = var.calculateVariance(Approximation=False)
+
+        self.assertTrue(hasattr(var, 'variance'))
+        self.assertEqual(var.variance, returned)
+        self.assertGreater(var.variance, 0)
+
+    def test_set_weights_updates_var(self):
+        """Test that changing weights produces a different VaR value"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        var_before = var.var(marketValue=0, window=1)
+
+        # Concentrate all weight on first asset
+        var.setWeights(np.array([1.0, 0.0, 0.0]))
+        var_after = var.var(marketValue=0, window=1)
+
+        self.assertNotAlmostEqual(var_before, var_after, places=6)
+
+    def test_set_portfolio_updates_var(self):
+        """Test that updating portfolio data changes the VaR calculation"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        var_before = var.var(marketValue=0, window=1)
+
+        # Uniformly trending prices (very small variance)
+        stable_prices = np.array([
+            [100.0, 200.0, 150.0],
+            [100.1, 200.1, 150.1],
+            [100.2, 200.2, 150.2],
+            [100.3, 200.3, 150.3],
+            [100.4, 200.4, 150.4],
+        ])
+        var.setPortfolio(stable_prices)
+        var_after = var.var(marketValue=0, window=1)
+
+        # Very stable prices → lower VaR
+        self.assertGreater(var_before, var_after)
+
+    def test_higher_confidence_level_increases_var(self):
+        """Test that increasing the confidence level always increases parametric VaR"""
+        var_90 = ValueAtRisk(0.90, self.sample_prices, self.weights).var(marketValue=0, window=1)
+        var_95 = ValueAtRisk(0.95, self.sample_prices, self.weights).var(marketValue=0, window=1)
+        var_99 = ValueAtRisk(0.99, self.sample_prices, self.weights).var(marketValue=0, window=1)
+
+        self.assertLess(var_90, var_95)
+        self.assertLess(var_95, var_99)
+
 
 if __name__ == '__main__':
     unittest.main()
