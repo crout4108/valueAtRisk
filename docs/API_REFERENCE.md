@@ -261,6 +261,8 @@ rebalanced_var = var_calc.var(marketValue=1000000)
 
 The `HistoricalVaR` class extends `ValueAtRisk` to implement historical simulation VaR.
 
+> 📖 For a comprehensive guide to the historical simulation method—including window-size selection, advantages, limitations, and worked examples—see **[Historical VaR Guide](HISTORICAL_VAR.md)**.
+
 ### Class Definition
 
 ```python
@@ -559,5 +561,6 @@ result = hist_var.var(window=100)  # Use reasonable window
 ## See Also
 
 - [README.md](../README.md) - General documentation
+- [Historical VaR Guide](HISTORICAL_VAR.md) - In-depth guide to the historical simulation method
 - [examples/](../examples/) - Usage examples
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
