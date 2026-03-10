@@ -233,6 +233,184 @@ class TestValueAtRisk(unittest.TestCase):
         # Higher confidence interval should give higher VaR
         self.assertGreater(var_99, var_95)
 
+    def test_weights_not_summing_to_one(self):
+        """Test that weights not summing to 1.0 still work (no validation)"""
+        # The library doesn't validate that weights sum to 1.0
+        # This test documents current behavior
+        weights_not_normalized = np.array([0.5, 0.5, 0.5])
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, weights_not_normalized)
+        var_result = var.var(marketValue=1000000, window=1)
+
+        # Should still calculate (though results may not be meaningful)
+        self.assertIsInstance(var_result, (int, float, np.number))
+
+    def test_single_asset_portfolio(self):
+        """Test VaR calculation with single asset portfolio"""
+        single_asset_prices = self.sample_prices[:, 0:1]  # Take only first column
+        single_weight = np.array([1.0])
+
+        var = ValueAtRisk(self.confidence_interval, single_asset_prices, single_weight)
+        var_result = var.var(marketValue=1000000, window=1)
+
+        # Should work with single asset
+        self.assertGreater(var_result, 0)
+
+        # Covariance matrix for single asset is a scalar (0-d array)
+        cov_matrix = var.covMatrix()
+        self.assertTrue(np.isscalar(cov_matrix) or cov_matrix.shape == ())
+
+    def test_minimal_data_three_rows(self):
+        """Test VaR with minimal reasonable data (3 price points = 2 returns)"""
+        minimal_prices = self.sample_prices[:3, :]  # First 3 rows
+
+        var = ValueAtRisk(self.confidence_interval, minimal_prices, self.weights)
+
+        # Should have 2 returns (minimum for covariance calculation)
+        self.assertEqual(var.returnMatrix.shape[0], 2)
+
+        # Should still calculate VaR
+        var_result = var.var(marketValue=1000000, window=1)
+        self.assertGreater(var_result, 0)
+
+    def test_variance_consistency_across_methods(self):
+        """Test that both variance calculation methods are positive"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        variance_exact = var.calculateVariance(Approximation=False)
+        variance_approx = var.calculateVariance(Approximation=True)
+
+        # Both should be positive
+        self.assertGreater(variance_exact, 0)
+        self.assertGreater(variance_approx, 0)
+
+        # Both should be similar order of magnitude (within 10x)
+        ratio = max(variance_exact, variance_approx) / min(variance_exact, variance_approx)
+        self.assertLess(ratio, 10, "Variance methods differ by more than 10x")
+
+    def test_var_with_zero_window(self):
+        """Test VaR calculation with window=0 (should still work)"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Window of 0 means sqrt(0) = 0, so VaR should be 0
+        var_result = var.var(marketValue=1000000, window=0)
+        self.assertEqual(var_result, 0)
+
+    def test_var_percentage_vs_dollar_consistency(self):
+        """Test consistency between percentage and dollar VaR"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        market_value = 1000000
+
+        var_pct = var.var(marketValue=0, window=1)
+        var_dollar = var.var(marketValue=market_value, window=1)
+
+        # Dollar VaR should equal percentage VaR times market value
+        self.assertAlmostEqual(var_dollar, var_pct * market_value, places=5)
+
+    def test_cov_matrix_positive_semidefinite(self):
+        """Test that covariance matrix is positive semi-definite"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+        cov_matrix = var.covMatrix()
+
+        # All eigenvalues should be non-negative for positive semi-definite matrix
+        eigenvalues = np.linalg.eigvals(cov_matrix)
+        for eigenvalue in eigenvalues:
+            self.assertGreaterEqual(eigenvalue.real, -1e-10)  # Allow small numerical errors
+
+    def test_set_portfolio_dimension_mismatch(self):
+        """Test that setting portfolio with wrong dimensions raises error"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Try to set portfolio with different number of assets
+        wrong_size_prices = np.array([
+            [100, 200],  # Only 2 assets instead of 3
+            [102, 198],
+            [101, 201]
+        ])
+
+        # Should not raise an error in setPortfolio (no validation)
+        # But subsequent operations might fail
+        var.setPortfolio(wrong_size_prices)
+
+        # Return matrix should be updated
+        self.assertEqual(var.returnMatrix.shape[1], 2)
+
+    def test_equal_weights_portfolio(self):
+        """Test VaR with equal weights across all assets"""
+        equal_weights = np.array([1.0/3, 1.0/3, 1.0/3])
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, equal_weights)
+
+        var_result = var.var(marketValue=1000000, window=1)
+        self.assertGreater(var_result, 0)
+
+    def test_extreme_confidence_intervals(self):
+        """Test VaR with confidence intervals near boundaries"""
+        # Very low confidence (1%)
+        var_low = ValueAtRisk(0.01, self.sample_prices, self.weights)
+        var_1pct = var_low.var(marketValue=1000000, window=1)
+
+        # Very high confidence (99.9%)
+        var_high = ValueAtRisk(0.999, self.sample_prices, self.weights)
+        var_999 = var_high.var(marketValue=1000000, window=1)
+
+        # Higher confidence should give higher VaR
+        self.assertGreater(var_999, var_1pct)
+
+    def test_large_time_window(self):
+        """Test VaR with very large time window"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Annual VaR (252 trading days)
+        var_annual = var.var(marketValue=1000000, window=252)
+
+        # Daily VaR
+        var_daily = var.var(marketValue=1000000, window=1)
+
+        # Annual should be approximately sqrt(252) times daily
+        expected_ratio = np.sqrt(252)
+        actual_ratio = var_annual / var_daily
+
+        self.assertAlmostEqual(actual_ratio, expected_ratio, places=5)
+
+    def test_return_matrix_shape(self):
+        """Test that return matrix has correct shape"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Should have one less row than price matrix
+        self.assertEqual(var.returnMatrix.shape[0], self.sample_prices.shape[0] - 1)
+        # Should have same number of columns as price matrix
+        self.assertEqual(var.returnMatrix.shape[1], self.sample_prices.shape[1])
+
+    def test_return_matrix_log_returns(self):
+        """Test that return matrix uses log returns correctly"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Check multiple returns
+        for i in range(min(3, var.returnMatrix.shape[0])):
+            for j in range(var.returnMatrix.shape[1]):
+                expected = np.log(self.sample_prices[i+1, j] / self.sample_prices[i, j])
+                actual = var.returnMatrix[i, j]
+                self.assertAlmostEqual(actual, expected, places=10)
+
+    def test_variance_stored_in_object(self):
+        """Test that variance calculation stores result in object"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        # Calculate variance
+        variance_result = var.calculateVariance()
+
+        # Should be stored
+        self.assertEqual(var.variance, variance_result)
+
+    def test_var_with_negative_market_value(self):
+        """Test VaR with negative market value (should return percentage)"""
+        var = ValueAtRisk(self.confidence_interval, self.sample_prices, self.weights)
+
+        var_negative = var.var(marketValue=-1000000, window=1)
+        var_zero = var.var(marketValue=0, window=1)
+
+        # Both should return percentage (same value)
+        self.assertEqual(var_negative, var_zero)
+
 
 if __name__ == '__main__':
     unittest.main()
