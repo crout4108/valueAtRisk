@@ -17,6 +17,7 @@ While VaR is important in finance, note that **Conditional Value at Risk (CVaR)*
 ## 📚 Documentation
 
 - **[API Reference](docs/API_REFERENCE.md)** - Comprehensive API documentation
+- **[Historical VaR Guide](docs/HISTORICAL_VAR.md)** - In-depth guide to the historical simulation method
 - **[Examples](examples/)** - Practical usage examples
 - **[Contributing](CONTRIBUTING.md)** - Contribution guidelines
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards
